@@ -67,14 +67,17 @@
   .settings-toggle{margin-top:16px;background:none;border:none;color:var(--muted);font-family:inherit;font-size:12px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;gap:8px;padding:6px 0;-webkit-tap-highlight-color:transparent}
   .settings-toggle .chev{transition:transform .2s;color:var(--amber-dim)}
   .settings-toggle[aria-expanded="true"] .chev{transform:rotate(90deg)}
-  .settings{display:grid;gap:14px;overflow:hidden;max-height:0;opacity:0;transition:max-height .28s ease,opacity .22s ease,margin .28s ease;margin-top:0}
-  .settings.open{max-height:760px;opacity:1;margin-top:16px}
+  .settings{display:grid;gap:14px;overflow:hidden;max-height:0;opacity:0;transition:max-height .3s ease,opacity .22s ease,margin .3s ease;margin-top:0}
+  .settings.open{max-height:1000px;opacity:1;margin-top:16px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   @media(max-width:420px){.grid2{grid-template-columns:1fr}}
   .check{display:flex;align-items:center;gap:10px;cursor:pointer;-webkit-tap-highlight-color:transparent}
   .check input{width:18px;height:18px;flex:none;accent-color:var(--amber)}
   .check span{font-size:13px;color:var(--text)}
   .hint{font-size:11px;color:var(--muted-2);margin-top:5px;line-height:1.45}
+  .hint a{color:var(--amber-soft)}
+  .key-block{border-top:1px solid var(--line);padding-top:14px}
+  .lbl-soft{text-transform:none;letter-spacing:0;color:var(--muted-2)}
 
   .stage{margin-top:22px;display:none}
   .stage.show{display:block}
@@ -96,6 +99,7 @@
   .notice.show{display:block}
   .notice.err{border-color:rgba(226,96,58,.4)}
   .notice strong{color:var(--amber);font-weight:600}
+  .notice a{color:var(--amber);text-decoration:underline}
 
   :focus-visible{outline:2px solid var(--amber);outline-offset:2px}
   footer{margin-top:28px;font-size:10.5px;color:var(--muted-2);letter-spacing:.05em;text-align:center;line-height:1.6}
@@ -147,6 +151,12 @@
       <div class="hint">−1 = jedes Mal ein neues Bild. Feste Zahl = reproduzierbar.</div>
     </div>
     <label class="check"><input type="checkbox" id="enhance"><span>Prompt automatisch verbessern</span></label>
+
+    <div class="key-block">
+      <label class="field-label" for="key">Zugangsschlüssel <span class="lbl-soft">(für stabilen Zugang)</span></label>
+      <input id="key" type="text" placeholder="pk_…" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="hint">Kostenlos bei <a href="https://enter.pollinations.ai" target="_blank" rel="noopener">enter.pollinations.ai</a> erstellen (Publishable Key, beginnt mit „pk_"). Einmal eingeben — wird nur auf deinem Gerät gespeichert.</div>
+    </div>
   </div>
 
   <div class="stage" id="stage">
@@ -172,12 +182,37 @@
   const $ = id => document.getElementById(id);
   const el = {
     prompt:$('prompt'), go:$('goBtn'), toggle:$('settingsToggle'), settings:$('settings'),
-    size:$('size'), model:$('model'), seed:$('seed'), enhance:$('enhance'),
+    size:$('size'), model:$('model'), seed:$('seed'), enhance:$('enhance'), key:$('key'),
     stage:$('stage'), frame:$('frame'), img:$('resultImg'), loadLab:$('loadLab'),
     seedLabel:$('seedLabel'), open:$('openBtn'), notice:$('notice'),
   };
+  const sub = el.go.querySelector('.sub');
 
   let busy = false, currentUrl = '';
+
+  // ---- lokale Speicherung (nur auf diesem Gerät) ----
+  const LS = {
+    get(k, d){ try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+    set(k, v){ try { localStorage.setItem(k, v); } catch {} },
+  };
+  function restore(){
+    el.key.value = LS.get('bl_key', '');
+    const size = LS.get('bl_size', ''); if (size) el.size.value = size;
+    if (el.size.selectedIndex < 0) el.size.selectedIndex = 0;
+    const model = LS.get('bl_model', ''); if (model) el.model.value = model;
+    if (el.model.selectedIndex < 0) el.model.selectedIndex = 0;
+    el.seed.value = LS.get('bl_seed', '-1');
+    el.enhance.checked = LS.get('bl_enhance', '0') === '1';
+    refreshKeyState();
+  }
+  function persist(){
+    LS.set('bl_key', el.key.value.trim());
+    LS.set('bl_size', el.size.value);
+    LS.set('bl_model', el.model.value);
+    LS.set('bl_seed', el.seed.value);
+    LS.set('bl_enhance', el.enhance.checked ? '1' : '0');
+  }
+  function refreshKeyState(){ sub.textContent = el.key.value.trim() ? 'flux · mit Schlüssel' : 'flux · kostenlos'; }
 
   function notice(html, isErr){ el.notice.className = 'notice show' + (isErr?' err':''); el.notice.innerHTML = html; }
   function hideNotice(){ el.notice.className = 'notice'; }
@@ -185,9 +220,11 @@
   function buildUrl(prompt, seed){
     const [w,h] = el.size.value.split('x').map(Number);
     const p = new URLSearchParams({ width:w, height:h, seed:seed, model:el.model.value });
-    const ref = location.hostname;                 // echte Domain identifiziert die App -> bessere Zugriffsrechte als anonym
+    const ref = location.hostname;                 // echte Domain identifiziert die App
     if (ref) p.set('referrer', ref);
     if (el.enhance.checked) p.set('enhance', 'true');
+    const key = el.key.value.trim();
+    if (key) p.set('key', key);                     // stabiler Zugang mit Schlüssel
     return 'https://gen.pollinations.ai/image/' + encodeURIComponent(prompt) + '?' + p.toString();
   }
 
@@ -196,6 +233,7 @@
     const prompt = el.prompt.value.trim();
     if (!prompt){ notice('Gib zuerst einen Prompt ein — beschreib, was du sehen willst.', false); el.prompt.focus(); return; }
     hideNotice();
+    persist();
 
     let seed = parseInt(el.seed.value, 10);
     if (!Number.isFinite(seed) || seed < 0) seed = Math.floor(Math.random()*1e9);
@@ -211,45 +249,39 @@
     el.seedLabel.textContent = '';
 
     const maxAttempts = 3;
-    const backoff = [0, 6000, 12000];   // Wartezeit vor Versuch 2 und 3 (anonym: 1 Anfrage / 15 s)
+    const backoff = [0, 6000, 12000];   // Wartezeit vor Versuch 2 und 3
     let attempt = 0, elapsed = 0, tick = null, watchdog = null;
 
     function clearTimers(){ if(tick){clearInterval(tick);tick=null;} if(watchdog){clearTimeout(watchdog);watchdog=null;} }
     function releaseButton(){ busy = false; el.go.disabled = false; el.go.firstChild.textContent = 'Bild erzeugen'; }
-
     function startTick(label){
       elapsed = 0; el.loadLab.textContent = label;
       tick = setInterval(() => { elapsed++; el.loadLab.textContent = label + ' ' + elapsed + 's'; }, 1000);
     }
-
     function succeed(){
       clearTimers(); releaseButton();
       el.frame.classList.add('done');
       el.seedLabel.textContent = 'Seed ' + seed;
     }
-
     function giveUp(){
       clearTimers(); releaseButton();
       el.stage.className = 'stage';
-      notice('<strong>Der Bild-Dienst antwortet gerade nicht.</strong> Die kostenlose anonyme Nutzung von Pollinations ist stark limitiert und blockt zeitweise ganz. Warte kurz und tippe erneut — oder sag mir Bescheid, dann baue ich dir einen kostenlosen Zugangsschlüssel ein, mit dem es zuverlässig läuft.', true);
-    }
-
-    function nextAttempt(){
-      clearTimers();
-      attempt++;
-      if (attempt < maxAttempts){
-        el.loadLab.textContent = 'kurz warten …';
-        setTimeout(runAttempt, backoff[attempt]);
+      if (el.key.value.trim()){
+        notice('<strong>Der Bild-Dienst antwortet gerade nicht.</strong> Warte einen Moment und tippe erneut. Hakt es länger, prüfe, ob dein Schlüssel gültig ist (beginnt mit „pk_").', true);
       } else {
-        giveUp();
+        notice('<strong>Anonym blockt Pollinations gerade.</strong> Für stabilen, kostenlosen Zugang: hol dir einen Schlüssel bei <a href="https://enter.pollinations.ai" target="_blank" rel="noopener">enter.pollinations.ai</a> und trag ihn unter „Einstellungen → Zugangsschlüssel" ein. Danach läuft es zuverlässig.', true);
       }
     }
-
+    function nextAttempt(){
+      clearTimers(); attempt++;
+      if (attempt < maxAttempts){ el.loadLab.textContent = 'kurz warten …'; setTimeout(runAttempt, backoff[attempt]); }
+      else { giveUp(); }
+    }
     function runAttempt(){
       const label = attempt === 0 ? 'wird erzeugt …' : 'neuer Versuch (' + (attempt+1) + '/' + maxAttempts + ') …';
       startTick(label);
-      watchdog = setTimeout(nextAttempt, 45000);          // hängt zu lange -> als Fehlversuch behandeln
-      el.img.src = url + (attempt > 0 ? '&n=' + Date.now() : '');   // Nonce erzwingt neuen Ladeversuch
+      watchdog = setTimeout(nextAttempt, 45000);
+      el.img.src = url + (attempt > 0 ? '&n=' + Date.now() : '');
     }
 
     el.img.onload = succeed;
@@ -266,6 +298,10 @@
     el.toggle.setAttribute('aria-expanded', open);
   });
   el.open.addEventListener('click', () => { if (currentUrl) window.open(currentUrl, '_blank'); });
+  el.key.addEventListener('input', () => { refreshKeyState(); persist(); });
+  [el.size, el.model, el.seed, el.enhance].forEach(x => x.addEventListener('change', persist));
+
+  restore();
 })();
 </script>
 </body>
