@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0908">
+<title>bildlabor · online</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0908; --surface:#141110; --surface-2:#1b1712;
+    --line:#2a2318; --line-lit:#3a3020;
+    --amber:#ff9d2f; --amber-soft:#d98b3a; --amber-dim:#9c7538;
+    --text:#ece3d2; --muted:#8a7d63; --muted-2:#6b6049;
+    --err:#e2603a; --ok:#8fbf6a; --radius:3px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:radial-gradient(130% 90% at 50% -20%, rgba(255,157,47,.06), transparent 55%), var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Mono',ui-monospace,monospace;
+    font-size:15px; line-height:1.55; min-height:100dvh;
+    padding:calc(env(safe-area-inset-top) + clamp(18px,5vw,44px)) clamp(15px,5vw,22px) 64px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:560px;margin:0 auto}
+
+  header{margin-bottom:22px}
+  .eyebrow{font-size:10.5px;letter-spacing:.3em;text-transform:uppercase;color:var(--amber-dim);display:flex;align-items:center;gap:9px}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px rgba(143,191,106,.55);flex:none}
+  h1{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(2.5rem,13vw,3.4rem);line-height:.9;letter-spacing:-.02em;margin:.22em 0 .16em}
+  h1 .lit{color:var(--amber);text-shadow:0 0 26px rgba(255,157,47,.32)}
+  .tagline{font-size:12px;color:var(--muted)}
+
+  .field-label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:7px;display:block}
+  textarea,input,select{
+    width:100%;background:var(--surface);color:var(--text);
+    border:1px solid var(--line);border-radius:var(--radius);
+    font-family:inherit;font-size:16px;padding:13px;
+    transition:border-color .18s, box-shadow .18s;
+  }
+  textarea{resize:vertical;line-height:1.5}
+  #prompt{min-height:104px}
+  textarea:focus,input:focus,select:focus{outline:none;border-color:var(--amber-dim);box-shadow:0 0 0 1px var(--amber-dim),0 0 18px rgba(255,157,47,.08)}
+  ::placeholder{color:var(--muted-2)}
+  select{appearance:none;-webkit-appearance:none;cursor:pointer;
+    background-image:linear-gradient(45deg,transparent 50%,var(--amber-dim) 50%),linear-gradient(135deg,var(--amber-dim) 50%,transparent 50%);
+    background-position:calc(100% - 17px) center,calc(100% - 12px) center;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:34px}
+
+  .go{
+    width:100%;margin-top:14px;padding:17px;min-height:54px;
+    background:var(--amber);color:#1a1204;border:none;border-radius:var(--radius);
+    font-family:'Syne',sans-serif;font-weight:700;font-size:17px;
+    cursor:pointer;transition:transform .08s, filter .18s, opacity .18s;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .go:hover{filter:brightness(1.08)}
+  .go:active{transform:translateY(1px)}
+  .go:disabled{opacity:.55;cursor:not-allowed;filter:none}
+  .go .sub{display:block;font-family:'IBM Plex Mono',monospace;font-weight:400;font-size:11px;opacity:.7;margin-top:2px}
+
+  .settings-toggle{margin-top:16px;background:none;border:none;color:var(--muted);font-family:inherit;font-size:12px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;gap:8px;padding:6px 0;-webkit-tap-highlight-color:transparent}
+  .settings-toggle .chev{transition:transform .2s;color:var(--amber-dim)}
+  .settings-toggle[aria-expanded="true"] .chev{transform:rotate(90deg)}
+  .settings{display:grid;gap:14px;overflow:hidden;max-height:0;opacity:0;transition:max-height .28s ease,opacity .22s ease,margin .28s ease;margin-top:0}
+  .settings.open{max-height:760px;opacity:1;margin-top:16px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:420px){.grid2{grid-template-columns:1fr}}
+  .check{display:flex;align-items:center;gap:10px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .check input{width:18px;height:18px;flex:none;accent-color:var(--amber)}
+  .check span{font-size:13px;color:var(--text)}
+  .hint{font-size:11px;color:var(--muted-2);margin-top:5px;line-height:1.45}
+
+  .stage{margin-top:22px;display:none}
+  .stage.show{display:block}
+  .frame{position:relative;border:1px solid var(--line-lit);border-radius:var(--radius);background:var(--surface);overflow:hidden;min-height:120px}
+  .frame img{width:100%;height:auto;display:block}
+  .loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:var(--surface);z-index:2}
+  .frame.done .loading{display:none}
+  .scan{width:46px;height:46px;border:2px solid var(--line-lit);border-top-color:var(--amber);border-radius:50%;animation:spin .9s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.scan{animation-duration:2s}}
+  .loading .lab{font-size:12px;color:var(--muted);letter-spacing:.06em;text-align:center;padding:0 16px}
+
+  .meta{display:flex;flex-wrap:wrap;align-items:center;gap:11px;margin-top:11px;font-size:11px;color:var(--muted);letter-spacing:.04em}
+  .btn-ghost{background:none;border:1px solid var(--line-lit);color:var(--amber-soft);font-family:inherit;font-size:12px;padding:9px 13px;border-radius:var(--radius);cursor:pointer;transition:border-color .18s,color .18s;-webkit-tap-highlight-color:transparent}
+  .btn-ghost:hover{border-color:var(--amber-dim);color:var(--amber)}
+  .save-hint{width:100%;font-size:11px;color:var(--muted-2);margin-top:2px}
+
+  .notice{margin-top:18px;padding:13px 15px;border-radius:var(--radius);background:var(--surface-2);border:1px solid var(--line-lit);font-size:13px;line-height:1.55;color:var(--text);display:none}
+  .notice.show{display:block}
+  .notice.err{border-color:rgba(226,96,58,.4)}
+  .notice strong{color:var(--amber);font-weight:600}
+
+  :focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  footer{margin-top:28px;font-size:10.5px;color:var(--muted-2);letter-spacing:.05em;text-align:center;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow"><span class="dot"></span><span>online · pollinations</span></div>
+    <h1>bild<span class="lit">labor</span></h1>
+    <div class="tagline">läuft direkt am Handy — keine Anmeldung, kein Rechner nötig</div>
+  </header>
+
+  <label class="field-label" for="prompt">Prompt</label>
+  <textarea id="prompt" placeholder="Beschreibe das Bild …" autofocus></textarea>
+
+  <button class="go" id="goBtn">
+    Bild erzeugen
+    <span class="sub">flux · kostenlos</span>
+  </button>
+
+  <button class="settings-toggle" id="settingsToggle" aria-expanded="false">
+    <span class="chev">▸</span> Einstellungen
+  </button>
+
+  <div class="settings" id="settings">
+    <div class="grid2">
+      <div>
+        <label class="field-label" for="size">Größe</label>
+        <select id="size">
+          <option value="1024x1024">1024 × 1024 · Quadrat</option>
+          <option value="832x1216">832 × 1216 · Hochformat</option>
+          <option value="1216x832">1216 × 832 · Querformat</option>
+          <option value="768x768">768 × 768 · Klein/schnell</option>
+        </select>
+      </div>
+      <div>
+        <label class="field-label" for="model">Modell</label>
+        <select id="model">
+          <option value="flux">Flux · beste Qualität</option>
+          <option value="turbo">Turbo · schneller</option>
+        </select>
+      </div>
+    </div>
+    <div>
+      <label class="field-label" for="seed">Startwert (Seed)</label>
+      <input id="seed" type="number" value="-1" step="1" inputmode="numeric">
+      <div class="hint">−1 = jedes Mal ein neues Bild. Feste Zahl = reproduzierbar.</div>
+    </div>
+    <label class="check"><input type="checkbox" id="enhance"><span>Prompt automatisch verbessern</span></label>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="frame" id="frame">
+      <div class="loading"><div class="scan"></div><div class="lab" id="loadLab">wird erzeugt …</div></div>
+      <img id="resultImg" alt="Erzeugtes Bild">
+    </div>
+    <div class="meta">
+      <span id="seedLabel"></span>
+      <button class="btn-ghost" id="openBtn">Bild öffnen</button>
+      <span class="save-hint">Zum Speichern lange auf das Bild tippen.</span>
+    </div>
+  </div>
+
+  <div class="notice" id="notice"></div>
+
+  <footer>bildlabor · online-modus<br>Tipp: über „Zum Home-Bildschirm" wird's zur App.</footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const el = {
+    prompt:$('prompt'), go:$('goBtn'), toggle:$('settingsToggle'), settings:$('settings'),
+    size:$('size'), model:$('model'), seed:$('seed'), enhance:$('enhance'),
+    stage:$('stage'), frame:$('frame'), img:$('resultImg'), loadLab:$('loadLab'),
+    seedLabel:$('seedLabel'), open:$('openBtn'), notice:$('notice'),
+  };
+
+  let busy = false, currentUrl = '';
+
+  function notice(html, isErr){ el.notice.className = 'notice show' + (isErr?' err':''); el.notice.innerHTML = html; }
+  function hideNotice(){ el.notice.className = 'notice'; }
+
+  function buildUrl(prompt, seed){
+    const [w,h] = el.size.value.split('x').map(Number);
+    const p = new URLSearchParams({ width:w, height:h, seed:seed, model:el.model.value });
+    const ref = location.hostname;                 // echte Domain identifiziert die App -> bessere Zugriffsrechte als anonym
+    if (ref) p.set('referrer', ref);
+    if (el.enhance.checked) p.set('enhance', 'true');
+    return 'https://gen.pollinations.ai/image/' + encodeURIComponent(prompt) + '?' + p.toString();
+  }
+
+  function generate(){
+    if (busy) return;
+    const prompt = el.prompt.value.trim();
+    if (!prompt){ notice('Gib zuerst einen Prompt ein — beschreib, was du sehen willst.', false); el.prompt.focus(); return; }
+    hideNotice();
+
+    let seed = parseInt(el.seed.value, 10);
+    if (!Number.isFinite(seed) || seed < 0) seed = Math.floor(Math.random()*1e9);
+
+    const url = buildUrl(prompt, seed);
+    currentUrl = url;
+
+    busy = true;
+    el.go.disabled = true;
+    el.go.firstChild.textContent = 'Läuft …';
+    el.stage.className = 'stage show';
+    el.frame.classList.remove('done');
+    el.seedLabel.textContent = '';
+
+    const maxAttempts = 3;
+    const backoff = [0, 6000, 12000];   // Wartezeit vor Versuch 2 und 3 (anonym: 1 Anfrage / 15 s)
+    let attempt = 0, elapsed = 0, tick = null, watchdog = null;
+
+    function clearTimers(){ if(tick){clearInterval(tick);tick=null;} if(watchdog){clearTimeout(watchdog);watchdog=null;} }
+    function releaseButton(){ busy = false; el.go.disabled = false; el.go.firstChild.textContent = 'Bild erzeugen'; }
+
+    function startTick(label){
+      elapsed = 0; el.loadLab.textContent = label;
+      tick = setInterval(() => { elapsed++; el.loadLab.textContent = label + ' ' + elapsed + 's'; }, 1000);
+    }
+
+    function succeed(){
+      clearTimers(); releaseButton();
+      el.frame.classList.add('done');
+      el.seedLabel.textContent = 'Seed ' + seed;
+    }
+
+    function giveUp(){
+      clearTimers(); releaseButton();
+      el.stage.className = 'stage';
+      notice('<strong>Der Bild-Dienst antwortet gerade nicht.</strong> Die kostenlose anonyme Nutzung von Pollinations ist stark limitiert und blockt zeitweise ganz. Warte kurz und tippe erneut — oder sag mir Bescheid, dann baue ich dir einen kostenlosen Zugangsschlüssel ein, mit dem es zuverlässig läuft.', true);
+    }
+
+    function nextAttempt(){
+      clearTimers();
+      attempt++;
+      if (attempt < maxAttempts){
+        el.loadLab.textContent = 'kurz warten …';
+        setTimeout(runAttempt, backoff[attempt]);
+      } else {
+        giveUp();
+      }
+    }
+
+    function runAttempt(){
+      const label = attempt === 0 ? 'wird erzeugt …' : 'neuer Versuch (' + (attempt+1) + '/' + maxAttempts + ') …';
+      startTick(label);
+      watchdog = setTimeout(nextAttempt, 45000);          // hängt zu lange -> als Fehlversuch behandeln
+      el.img.src = url + (attempt > 0 ? '&n=' + Date.now() : '');   // Nonce erzwingt neuen Ladeversuch
+    }
+
+    el.img.onload = succeed;
+    el.img.onerror = nextAttempt;
+    runAttempt();
+  }
+
+  el.go.addEventListener('click', generate);
+  el.prompt.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter'){ e.preventDefault(); generate(); }
+  });
+  el.toggle.addEventListener('click', () => {
+    const open = el.settings.classList.toggle('open');
+    el.toggle.setAttribute('aria-expanded', open);
+  });
+  el.open.addEventListener('click', () => { if (currentUrl) window.open(currentUrl, '_blank'); });
+})();
+</script>
+</body>
+</html>
